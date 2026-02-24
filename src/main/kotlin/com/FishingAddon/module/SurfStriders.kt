@@ -9,7 +9,6 @@ import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.InventoryUtils
-import org.cobalt.api.util.ReflectionUtils
 import org.cobalt.api.rotation.EasingType
 import org.cobalt.api.rotation.RotationExecutor
 import org.cobalt.api.rotation.strategy.TimedEaseStrategy
@@ -170,10 +169,7 @@ object SurfStriders : Module("SurfStriders Settings"){
           macroState = MacroState.REELING
         } else {
           val bobber = mc.player?.fishing
-          val isBobbing = bobber?.let {
-            val currentState = ReflectionUtils.getField<Any>(it, "currentState") as? Enum<*>
-            currentState?.ordinal == 2
-          } ?: false
+          val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
           if (!isBobbing && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
             macroState = MacroState.REELING

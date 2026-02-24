@@ -1,7 +1,0 @@
-{
-  "id": "fishing_addon",
-  "name": "FishingAddon",
-  "version": "1.0.0",
-  "entrypoints": ["com.fishingaddon.FishingAddon"],
-  "mixins": ["fishingaddon.mixins.json"]
-}

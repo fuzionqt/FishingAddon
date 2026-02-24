@@ -6,8 +6,6 @@ import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.MouseUtils
-import org.cobalt.api.util.ReflectionUtils
-import org.cobalt.api.util.ChatUtils
 import com.FishingAddon.util.helper.Clock
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
@@ -44,10 +42,7 @@ object Normal : Module(
   private var waitingStartTime = 0L
   private val mc = Minecraft.getInstance()
   val bobber = mc.player?.fishing
-  var isBobbing = bobber?.let {
-    val currentState = ReflectionUtils.getField<Any>(it, "currentState") as? Enum<*>
-    currentState?.ordinal == 2
-  }
+  var isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
   private enum class MacroState {
     IDLE,
@@ -59,9 +54,7 @@ object Normal : Module(
   }
 
   internal fun start() {
-     isBobbing = bobber?.let {
-      val currentState = ReflectionUtils.getField<Any>(it, "currentState") as? Enum<*>
-      currentState?.ordinal == 2}
+     isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
     if (bobber != null) {
       macroState = MacroState.WAITING
@@ -81,9 +74,7 @@ object Normal : Module(
 
     //check: ensure player world and gameMode exist
     if (mc.player == null || mc.level == null || mc.gameMode == null) return
-    isBobbing = bobber?.let {
-      val currentState = ReflectionUtils.getField<Any>(it, "currentState") as? Enum<*>
-      currentState?.ordinal == 2}
+    isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
     when (macroState) {
       MacroState.SWAP_TO_ROD -> {
         swapToFishingRod()
@@ -104,10 +95,7 @@ object Normal : Module(
           macroState = MacroState.REELING
         } else {
           val bobber = mc.player?.fishing
-          val isBobbing = bobber?.let {
-            val currentState = ReflectionUtils.getField<Any>(it, "currentState") as? Enum<*>
-            currentState?.ordinal == 2
-          } ?: false
+          val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
           if (!isBobbing && bobber != null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
             macroState = MacroState.REELING
             clock.schedule(Random.nextInt(100, 200))
