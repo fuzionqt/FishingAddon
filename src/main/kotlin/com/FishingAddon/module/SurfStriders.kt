@@ -237,7 +237,7 @@ object SurfStriders : Module("SurfStriders Settings"){
         if (slot != -1) {
           InventoryUtils.holdHotbarSlot(slot)
           clock.schedule(Random.nextInt(100, 200))
-          macroState = MacroState.RESET
+          macroState = MacroState.SWAP_TO_ROD
         } else {
           macroState = MacroState.RESET
         }
