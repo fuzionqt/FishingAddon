@@ -85,6 +85,7 @@ object SurfStriders : Module("SurfStriders Settings"){
     AXE_SWAP,
     // killing with foraging axe melee , done hopefully
     ROTATE_TO_SURFSTRIDER_MELEE,
+    AXE_SWAP_MELEE,
     MELEE_ATTACK,
     // resetting
     RESET,
@@ -124,7 +125,7 @@ object SurfStriders : Module("SurfStriders Settings"){
     )
   }
 
-  private fun rotateTo(target: Strider, duration: Long = 150L) {
+  private fun rotateTo(target: Strider, duration: Long = 300L) {
     val player = mc.player ?: return
 
     val dx = target.x - player.x
@@ -253,6 +254,16 @@ object SurfStriders : Module("SurfStriders Settings"){
         clock.schedule(Random.nextInt(200,300))
         macroState = MacroState.MELEE_ATTACK
       }
+      MacroState.AXE_SWAP_MELEE -> {
+        val slot = InventoryUtils.findItemInHotbar("figstone")
+        if (slot != -1) {
+          InventoryUtils.holdHotbarSlot(slot)
+          clock.schedule(Random.nextInt(100, 200))
+          macroState = MacroState.MELEE_ATTACK
+        } else {
+          macroState = MacroState.RESET
+        }
+      }
 
       MacroState.MELEE_ATTACK -> {
         MouseUtils.leftClick()
@@ -269,7 +280,7 @@ object SurfStriders : Module("SurfStriders Settings"){
       }
 
       MacroState.RESET -> {
-        rotateTo(originalYaw, originalPitch, duration = 150L)
+        rotateTo(originalYaw, originalPitch, duration = 300L)
         clock.schedule(Random.nextInt(100, 200))
         targetStrider = null
         macroState = MacroState.CASTING
