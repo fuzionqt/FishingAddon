@@ -92,14 +92,6 @@ object WormFishing : Module("WormFishing Settings") {
         max = 1000.0
     )
 
-    private val stateTransitionDelay by RangeSetting(
-        name = "State Transition Delay",
-        description = "Small delays between logic steps (in ms)",
-        defaultValue = Pair(100.0, 200.0),
-        min = 10.0,
-        max = 500.0
-    )
-
     private var macroState = MacroState.IDLE
     private val clock = Clock()
     private val mc = Minecraft.getInstance()
@@ -134,10 +126,6 @@ object WormFishing : Module("WormFishing Settings") {
             killSilverfishAt.first.toInt(),
             killSilverfishAt.second.toInt() + 1
         )
-    }
-
-    private fun getTransitionDelay(): Int {
-        return Random.nextInt(stateTransitionDelay.first.toInt(), stateTransitionDelay.second.toInt() + 1)
     }
 
     private fun getRandomDelay(delayRange: Pair<Double, Double>): Int {
@@ -196,16 +184,13 @@ object WormFishing : Module("WormFishing Settings") {
             MacroState.REELING -> {
                 MouseUtils.rightClick()
                 macroState = MacroState.POST_REEL_DECIDE
-                clock.schedule(getTransitionDelay())
             }
 
             MacroState.POST_REEL_DECIDE -> {
                 if (shouldKillSilverfish()) {
                     macroState = MacroState.HYPERION_SWAP
-                    clock.schedule(getTransitionDelay())
                 } else {
                     macroState = MacroState.CASTING
-                    clock.schedule(getTransitionDelay())
                 }
             }
 
@@ -222,13 +207,11 @@ object WormFishing : Module("WormFishing Settings") {
 
             MacroState.HYPERION_USE -> {
                 MouseUtils.rightClick()
-                clock.schedule(getTransitionDelay())
                 macroState = MacroState.RESET
             }
 
             MacroState.RESET -> {
                 generateNewThreshold()
-                clock.schedule(getTransitionDelay())
                 macroState = MacroState.SWAP_TO_ROD
             }
 
@@ -268,13 +251,13 @@ object WormFishing : Module("WormFishing Settings") {
     }
 
     @SubscribeEvent
-    fun onWorldRender(event: WorldRenderEvent.Start) {
+    fun  onWorldRender(event: WorldRenderEvent.Start) {
         if (!highlightWormfishSpot) return
 
         val player = mc.player ?: return
         val level = mc.level ?: return
         val playerPos = player.blockPosition()
-        val lavaPos = detectWormfishSpot(level, playerPos, 128) ?: return
+        val lavaPos = detectWormfishSpot(level, playerPos, 30) ?: return
 
         val blockBox = AABB.ofSize(
             Vec3.atCenterOf(lavaPos),
