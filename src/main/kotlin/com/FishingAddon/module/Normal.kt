@@ -25,172 +25,172 @@ import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.render.Render3D
 
 object Normal : Module(
-  name = "Normal Settings"
+    name = "Normal Settings"
 ) {
-  private val castDelay by RangeSetting(
-    name = "Cast Delay",
-    description = "Delay range before recasting (in ms)",
-    defaultValue = Pair(200.0, 500.0),
-    min = 0.0,
-    max = 1000.0
-  )
-
-  private val reelInDelay by RangeSetting(
-    name = "Reel In Delay",
-    description = "Delay range after fish bite detection (in ms)",
-    defaultValue = Pair(50.0, 150.0),
-    min = 0.0,
-    max = 1000.0
-  )
-
-  private val bobberTimeout by SliderSetting(
-    name = "Bobber Timeout",
-    description = "Time to wait for bobber to enter water before recasting (in ms)",
-    defaultValue = 20000.0,
-    min = 5000.0,
-    max = 60000.0
-  )
-
-  private val killingMode by ModeSetting(
-    name = "Killing Mode",
-    description = "Method to kill sea creatures (if applicable)",
-    defaultValue = 0,
-    options = arrayOf("None", "Melee", "wither impact/yeti sword","Frozen scythe/spiritsceptre")
-  )
-  private val weaponSlot by SliderSetting(
-    name = "Weapon Slot",
-    description = "Inventory slot of the weapon used for killing",
-    defaultValue = 1.0,
-    min = 1.0,
-    max = 8.0
-  )
-
-  private var originalYaw = 0f
-  private var originalPitch = 0f
-  private var macroState = MacroState.IDLE
-  private val clock = Clock()
-  private var waitingStartTime = 0L
-  private val mc = Minecraft.getInstance()
-  val bobber = mc.player?.fishing
-  var isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
-
-  private val existingEntityIds = mutableSetOf<Int>()
-  private var detectedSeaCreatureEntity: net.minecraft.world.entity.Entity? = null
-  private var detectedSeaCreatureName: String? = null
-  private var detectionComplete = false
-  private var detectionAttempts = 0
-  private val maxDetectionAttempts = 20
-
-  private enum class MacroState {
-    IDLE,
-    SWAP_TO_ROD,
-    CASTING,
-    WAITING,
-    REELING,
-    POST_REEL_DECIDE,
-    DETECTING_CREATURE,
-    RESETTING,
-    MOBKILL_MELEE,
-    WITHERIMPACT_YETI,
-    FROZEN_SPIRIT,
-    RESET
-  }
-
-  internal fun start() {
-     isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
-    if (!isBobbing){
-      macroState = MacroState.SWAP_TO_ROD
-    } else macroState = MacroState.WAITING
-  }
-
-  internal fun resetStates() {
-    macroState = MacroState.IDLE
-  }
-
-  private fun rotateTo(yaw: Float, pitch: Float, duration: Long = 150L) {
-    RotationExecutor.rotateTo(
-      Rotation(yaw, pitch),
-      TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, duration)
+    private val castDelay by RangeSetting(
+        name = "Cast Delay",
+        description = "Delay range before recasting (in ms)",
+        defaultValue = Pair(200.0, 500.0),
+        min = 0.0,
+        max = 1000.0
     )
-  }
 
-  internal fun onTick() {
-    if (!clock.passed()) return
+    private val reelInDelay by RangeSetting(
+        name = "Reel In Delay",
+        description = "Delay range after fish bite detection (in ms)",
+        defaultValue = Pair(50.0, 150.0),
+        min = 0.0,
+        max = 1000.0
+    )
 
-    if (mc.player == null || mc.level == null || mc.gameMode == null) return
-    isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+    private val bobberTimeout by SliderSetting(
+        name = "Bobber Timeout",
+        description = "Time to wait for bobber to enter water before recasting (in ms)",
+        defaultValue = 20000.0,
+        min = 5000.0,
+        max = 60000.0
+    )
 
-    when (macroState) {
-      MacroState.SWAP_TO_ROD -> {
-        swapToFishingRod()
-        clock.schedule(Random.nextInt(200, 500))
-        macroState = MacroState.CASTING
-      }
+    private val killingMode by ModeSetting(
+        name = "Killing Mode",
+        description = "Method to kill sea creatures (if applicable)",
+        defaultValue = 0,
+        options = arrayOf("None", "Melee", "wither impact/yeti sword", "Frozen scythe/spiritsceptre")
+    )
+    private val weaponSlot by SliderSetting(
+        name = "Weapon Slot",
+        description = "Inventory slot of the weapon used for killing",
+        defaultValue = 1.0,
+        min = 1.0,
+        max = 8.0
+    )
 
-      MacroState.CASTING -> {
-        MouseUtils.rightClick()
-        waitingStartTime = System.currentTimeMillis()
-        clock.schedule(Random.nextInt(100, 200))
-        macroState = MacroState.WAITING
-      }
+    private var originalYaw = 0f
+    private var originalPitch = 0f
+    private var macroState = MacroState.IDLE
+    private val clock = Clock()
+    private var waitingStartTime = 0L
+    private val mc = Minecraft.getInstance()
+    val bobber = mc.player?.fishing
+    var isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
-      MacroState.WAITING -> {
-        if (detectFishbite()) {
-          clock.schedule(Random.nextInt(reelInDelay.first.toInt(), reelInDelay.second.toInt()))
-          macroState = MacroState.REELING
-        } else {
-          val bobber = mc.player?.fishing
-          val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
-          if (!isBobbing && bobber != null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
-            macroState = MacroState.REELING
-            clock.schedule(Random.nextInt(100, 200))
-          } else if (bobber == null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
-            macroState = MacroState.CASTING
-          }
-        }
-      }
+    private val existingEntityIds = mutableSetOf<Int>()
+    private var detectedSeaCreatureEntity: net.minecraft.world.entity.Entity? = null
+    private var detectedSeaCreatureName: String? = null
+    private var detectionComplete = false
+    private var detectionAttempts = 0
+    private val maxDetectionAttempts = 20
 
-      MacroState.REELING -> {
-        MouseUtils.rightClick()
+    private enum class MacroState {
+        IDLE,
+        SWAP_TO_ROD,
+        CASTING,
+        WAITING,
+        REELING,
+        POST_REEL_DECIDE,
+        DETECTING_CREATURE,
+        RESETTING,
+        MOBKILL_MELEE,
+        WITHERIMPACT_YETI,
+        FROZEN_SPIRIT,
+        RESET
+    }
 
-        existingEntityIds.clear()
-        mc.player?.let { player ->
-            mc.level?.entitiesForRendering()?.forEach { entity ->
-                if (entity.distanceTo(player) <= 20) {
-                    existingEntityIds.add(entity.id)
+    internal fun start() {
+        isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+        if (!isBobbing) {
+            macroState = MacroState.SWAP_TO_ROD
+        } else macroState = MacroState.WAITING
+    }
+
+    internal fun resetStates() {
+        macroState = MacroState.IDLE
+    }
+
+    private fun rotateTo(yaw: Float, pitch: Float, duration: Long = 150L) {
+        RotationExecutor.rotateTo(
+            Rotation(yaw, pitch),
+            TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, duration)
+        )
+    }
+
+    internal fun onTick() {
+        if (!clock.passed()) return
+
+        if (mc.player == null || mc.level == null || mc.gameMode == null) return
+        isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+
+        when (macroState) {
+            MacroState.SWAP_TO_ROD -> {
+                swapToFishingRod()
+                clock.schedule(Random.nextInt(200, 500))
+                macroState = MacroState.CASTING
+            }
+
+            MacroState.CASTING -> {
+                MouseUtils.rightClick()
+                waitingStartTime = System.currentTimeMillis()
+                clock.schedule(Random.nextInt(100, 200))
+                macroState = MacroState.WAITING
+            }
+
+            MacroState.WAITING -> {
+                if (detectFishbite()) {
+                    clock.schedule(Random.nextInt(reelInDelay.first.toInt(), reelInDelay.second.toInt()))
+                    macroState = MacroState.REELING
+                } else {
+                    val bobber = mc.player?.fishing
+                    val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+                    if (!isBobbing && bobber != null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
+                        macroState = MacroState.REELING
+                        clock.schedule(Random.nextInt(100, 200))
+                    } else if (bobber == null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
+                        macroState = MacroState.CASTING
+                    }
                 }
             }
-        }
 
-        clock.schedule(Random.nextInt(200, 400))
-        macroState = MacroState.POST_REEL_DECIDE
-      }
+            MacroState.REELING -> {
+                MouseUtils.rightClick()
 
-      MacroState.RESETTING -> {
+                existingEntityIds.clear()
+                mc.player?.let { player ->
+                    mc.level?.entitiesForRendering()?.forEach { entity ->
+                        if (entity.distanceTo(player) <= 20) {
+                            existingEntityIds.add(entity.id)
+                        }
+                    }
+                }
 
-        clock.schedule(Random.nextInt(castDelay.first.toInt(), castDelay.second.toInt()))
-        macroState = MacroState.CASTING
-      }
+                clock.schedule(Random.nextInt(200, 400))
+                macroState = MacroState.POST_REEL_DECIDE
+            }
 
-      MacroState.IDLE -> {
-      }
+            MacroState.RESETTING -> {
 
-      MacroState.POST_REEL_DECIDE -> {
-        mc.player?.let {
-          originalYaw = it.yRot
-          originalPitch = it.xRot
-        }
+                clock.schedule(Random.nextInt(castDelay.first.toInt(), castDelay.second.toInt()))
+                macroState = MacroState.CASTING
+            }
+
+            MacroState.IDLE -> {
+            }
+
+            MacroState.POST_REEL_DECIDE -> {
+                mc.player?.let {
+                    originalYaw = it.yRot
+                    originalPitch = it.xRot
+                }
 //        if (!shouldKillSeaCreatures()){
 //          clock.schedule(Random.nextInt(100, 200))
 //          macroState = MacroState.RESETTING
 //        }
 
-        detectionAttempts = 0
-        clock.schedule(50)
-        macroState = MacroState.RESETTING
-      }
+                detectionAttempts = 0
+                clock.schedule(50)
+                macroState = MacroState.RESETTING
+            }
 
-      MacroState.DETECTING_CREATURE -> {
+            MacroState.DETECTING_CREATURE -> {
 //        detectionAttempts++
 //
 //        val newEntityName = detectSeaCreature()
@@ -240,47 +240,47 @@ object Normal : Module(
 //          ChatUtils.sendDebug("$newEntityName")
 //        }
 //
-      }
+            }
 
-      MacroState.MOBKILL_MELEE -> {
-        // TODO: Implement melee killing
-      }
+            MacroState.MOBKILL_MELEE -> {
+                // TODO: Implement melee killing
+            }
 
-      MacroState.WITHERIMPACT_YETI -> {
-        // TODO: Implement wither impact/yeti sword killing
-      }
+            MacroState.WITHERIMPACT_YETI -> {
+                // TODO: Implement wither impact/yeti sword killing
+            }
 
-      MacroState.FROZEN_SPIRIT -> {
-        // TODO: Implement frozen scythe/spirit sceptre killing
-      }
+            MacroState.FROZEN_SPIRIT -> {
+                // TODO: Implement frozen scythe/spirit sceptre killing
+            }
 
-      MacroState.RESET -> {
-        rotateTo(originalYaw, originalPitch, duration = 300L)
-        clock.schedule(Random.nextInt(100, 200))
-        macroState = MacroState.CASTING
-      }
-    }
-  }
-
-
-  fun detectSeaCreature(): String? {
-    val player = mc.player ?: return null
-    val level = mc.level ?: return null
-
-    val newEntities = level.entitiesForRendering().filter { entity ->
-        entity.distanceTo(player) <= 20 &&
-        entity.hasCustomName() &&
-        !existingEntityIds.contains(entity.id) &&
-        entity.name.string.contains("❤")  // Filter for heart symbol only
+            MacroState.RESET -> {
+                rotateTo(originalYaw, originalPitch, duration = 300L)
+                clock.schedule(Random.nextInt(100, 200))
+                macroState = MacroState.CASTING
+            }
+        }
     }
 
-    val sortedEntities = newEntities.sortedBy { it.distanceTo(player) }
-    if (sortedEntities.isNotEmpty()) {
-        return sortedEntities.first().name.string
-    }
 
-    return null
-  }
+    fun detectSeaCreature(): String? {
+        val player = mc.player ?: return null
+        val level = mc.level ?: return null
+
+        val newEntities = level.entitiesForRendering().filter { entity ->
+            entity.distanceTo(player) <= 20 &&
+                entity.hasCustomName() &&
+                !existingEntityIds.contains(entity.id) &&
+                entity.name.string.contains("❤")  // Filter for heart symbol only
+        }
+
+        val sortedEntities = newEntities.sortedBy { it.distanceTo(player) }
+        if (sortedEntities.isNotEmpty()) {
+            return sortedEntities.first().name.string
+        }
+
+        return null
+    }
 
 
 //  fun seacreatureSpawned(): Boolean {

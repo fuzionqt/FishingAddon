@@ -12,23 +12,23 @@ import com.FishingAddon.module.WormFishing
 
 object FishingAddon : Addon() {
 
-  override fun onLoad() {
-    listOf(
-      Main,
-      Normal,
-      SurfStriders,
-      WormFishing,
-      HotspotFishing,
-      QOL
-    ).forEach(EventBus::register)
-    println("FishingAddon loaded!")
-  }
+    override fun onLoad() {
+        listOf(
+            Main,
+            Normal,
+            SurfStriders,
+            WormFishing,
+            HotspotFishing,
+            QOL
+        ).forEach(EventBus::register)
+        println("FishingAddon loaded!")
+    }
 
-  override fun onUnload() {
-    println("FishingAddon unloaded!")
-  }
+    override fun onUnload() {
+        println("FishingAddon unloaded!")
+    }
 
-  override fun getModules(): List<Module> {
-    return listOf(Main, Normal, SurfStriders, WormFishing, HotspotFishing, QOL)
-  }
+    override fun getModules(): List<Module> {
+        return listOf(Main, Normal, SurfStriders, WormFishing, HotspotFishing, QOL)
+    }
 }
