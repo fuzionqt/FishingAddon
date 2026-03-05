@@ -151,6 +151,12 @@ object WormFishing : Module("WormFishing Settings") {
                     val bobber = mc.player?.fishing
                     val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
+                    if (bobber == null) {
+                        clock.schedule(Random.nextInt(100, 200))
+                        macroState = MacroState.CASTING
+                        return
+                    }
+
                     if (!isBobbing && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
                         macroState = MacroState.REELING
                         clock.schedule(Random.nextInt(100, 200))
