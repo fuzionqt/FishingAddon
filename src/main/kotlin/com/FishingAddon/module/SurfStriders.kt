@@ -9,18 +9,11 @@ import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.InventoryUtils
-import org.cobalt.api.rotation.EasingType
-import org.cobalt.api.rotation.RotationExecutor
-import org.cobalt.api.rotation.strategy.TimedEaseStrategy
-import org.cobalt.api.util.helper.Rotation
 import com.FishingAddon.util.helper.Clock
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.world.entity.monster.Strider
 import net.minecraft.world.phys.Vec3
-import net.minecraft.util.Mth
-import kotlin.math.atan2
-import kotlin.math.sqrt
 import org.cobalt.api.util.ChatUtils
 
 object SurfStriders : Module("SurfStriders Settings") {
@@ -65,8 +58,6 @@ object SurfStriders : Module("SurfStriders Settings") {
     private var macroState = MacroState.IDLE
     private val clock = Clock()
     private val mc = Minecraft.getInstance()
-    private var originalYaw = 0f
-    private var originalPitch = 0f
     private var targetStrider: Strider? = null
     private var waitingStartTime = 0L
 
@@ -122,32 +113,6 @@ object SurfStriders : Module("SurfStriders Settings") {
         return countStriders() >= killStriderAt.toInt()
     }
 
-    private fun rotateTo(yaw: Float, pitch: Float, duration: Long = 150L) {
-        RotationExecutor.rotateTo(
-            Rotation(yaw, pitch),
-            TimedEaseStrategy(EasingType.LINEAR, EasingType.LINEAR, duration)
-        )
-    }
-
-    private fun rotateTo(target: Strider, duration: Long = 300L) {
-        val player = mc.player ?: return
-
-        val dx = target.x - player.x
-        val dy = (target.y + target.bbHeight) - (player.y + player.getEyeHeight(player.pose))
-        val dz = target.z - player.z
-
-        val dist = sqrt(dx * dx + dz * dz)
-
-        val yaw = Mth.wrapDegrees(
-            Math.toDegrees(atan2(dz, dx)).toFloat() - 90f
-        )
-        val pitch = Mth.wrapDegrees(
-            (-Math.toDegrees(atan2(dy, dist))).toFloat()
-        )
-
-        rotateTo(yaw, pitch, duration)
-    }
-
     internal fun onTick() {
         if (!clock.passed()) return
 
@@ -196,10 +161,6 @@ object SurfStriders : Module("SurfStriders Settings") {
             }
 
             MacroState.POST_REEL_DECIDE -> {
-                mc.player?.let {
-                    originalYaw = it.yRot
-                    originalPitch = it.xRot
-                }
                 targetStrider = findNearestStrider()
                 if (shouldKillStriders() && killingMode == 0) {
                     macroState = MacroState.ROTATE_TO_SURFSTRIDER_MELEE
@@ -214,10 +175,6 @@ object SurfStriders : Module("SurfStriders Settings") {
             }
 
             MacroState.ROTATE_FLAY -> {
-                //targetStrider?.let { strider ->
-                //  rotateTo(strider, duration = 150L)
-                // clock.schedule(Random.nextInt(100, 200))
-                //}
                 macroState = MacroState.SOUL_SWAP
             }
 
@@ -288,16 +245,16 @@ object SurfStriders : Module("SurfStriders Settings") {
                         macroState = MacroState.RESETTING
                         clock.schedule(Random.nextInt(100, 200))
                     }
-                } else if (shouldKillStriders() && findNearestStrider() != null) {
-                    rotateTo(currentTarget, duration = 120L)
-                    macroState = MacroState.MELEE_ATTACK
                 } else {
-                    macroState = MacroState.RESETTING
+                    if (shouldKillStriders() && findNearestStrider() != null) {
+                        macroState = MacroState.MELEE_ATTACK
+                    } else {
+                        macroState = MacroState.RESETTING
+                    }
                 }
             }
 
             MacroState.RESET -> {
-                rotateTo(originalYaw, originalPitch, duration = 300L)
                 clock.schedule(Random.nextInt(100, 200))
                 targetStrider = null
                 macroState = MacroState.SWAP_TO_ROD
