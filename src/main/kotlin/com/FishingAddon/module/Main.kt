@@ -31,6 +31,11 @@ object Main : Module(
         description = "Keybind to toggle the macro",
         defaultValue = KeyBind(GLFW.GLFW_KEY_J)
     )
+    var ungrabMouseKeyBind by KeyBindSetting(
+        name = "Ungrab Mouse Keybind",
+        description = "Keybind to toggle mouse grab",
+        defaultValue = KeyBind(GLFW.GLFW_KEY_U)
+    )
     val mode by ModeSetting(
         name = "FishingMode",
         description = "Fishing mode setting",
@@ -39,7 +44,9 @@ object Main : Module(
     )
 
     private var isToggled = false
+    private var isMouseUngrabbed = false
     private var wasKeyPressed = false
+    private var wasUngrabMouseKeyPressed = false
     private val mc = Minecraft.getInstance()
 
     // thanks claude for rendering the box for me <3
@@ -49,8 +56,6 @@ object Main : Module(
 
     fun start() {
         isToggled = true
-        MouseUtils.ungrabMouse()
-
 
         val player = mc.player
         if (player != null) {
@@ -69,7 +74,6 @@ object Main : Module(
 
     fun stop() {
         isToggled = false
-        MouseUtils.grabMouse()
 
         when (mode) {
             0 -> Normal.resetStates()
@@ -80,6 +84,21 @@ object Main : Module(
 
     @SubscribeEvent
     fun keybindListener(event: TickEvent) {
+        val isUngrabMousePressed = ungrabMouseKeyBind.isPressed()
+        if (isUngrabMousePressed && !wasUngrabMouseKeyPressed) {
+            isMouseUngrabbed = !isMouseUngrabbed
+
+            if (isMouseUngrabbed) MouseUtils.ungrabMouse()
+            else MouseUtils.grabMouse()
+
+            ChatUtils.sendMessage(
+                "Ungrab Mouse is now "
+                    + (if (isMouseUngrabbed) "§aEnabled" else "§cDisabled")
+                    + "§r"
+            )
+        }
+        wasUngrabMouseKeyPressed = isUngrabMousePressed
+
         val isPressed = keyBind.isPressed()
         if (isPressed && !wasKeyPressed) {
             isToggled = !isToggled
