@@ -17,7 +17,6 @@ import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.RangeSetting
-import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseUtils
 import org.cobalt.api.util.render.Render3D
@@ -45,12 +44,36 @@ object WormFishing : Module("WormFishing Settings") {
         max = 1000.0
     )
 
-    private val bobberTimeout by SliderSetting(
-        name = "Recast Bobber",
-        description = "Time to wait for bobber to enter water before recasting (in ms)",
-        defaultValue = 20000.0,
+    private val bobberTimeout by RangeSetting(
+        name = "Recast Bobber Delay",
+        description = "Time range to wait for bobber to enter water before recasting (in ms)",
+        defaultValue = Pair(20000.0, 25000.0),
         min = 5000.0,
         max = 60000.0
+    )
+
+    private val rodSwapDelay by RangeSetting(
+        name = "Rod Swap Delay",
+        description = "Delay after swapping to rod before casting (in ms)",
+        defaultValue = Pair(200.0, 500.0),
+        min = 50.0,
+        max = 1500.0
+    )
+
+    private val missingBobberRecastDelay by RangeSetting(
+        name = "Missing Bobber Recast Delay",
+        description = "Delay before recasting when bobber disappears (in ms)",
+        defaultValue = Pair(100.0, 200.0),
+        min = 10.0,
+        max = 1000.0
+    )
+
+    private val failedBobbingRecastDelay by RangeSetting(
+        name = "Failed Bobbing Recast Delay",
+        description = "Delay before reeling/recasting when bobber fails to bob (in ms)",
+        defaultValue = Pair(100.0, 200.0),
+        min = 10.0,
+        max = 1000.0
     )
 
     private val killSilverfishAt by RangeSetting(
@@ -81,6 +104,7 @@ object WormFishing : Module("WormFishing Settings") {
     private val clock = Clock()
     private val mc = Minecraft.getInstance()
     private var waitingStartTime = 0L
+    private var currentBobberTimeout = 0L
     private var currentKillThreshold = 20
 
     private enum class MacroState {
@@ -116,6 +140,10 @@ object WormFishing : Module("WormFishing Settings") {
         return Random.nextInt(stateTransitionDelay.first.toInt(), stateTransitionDelay.second.toInt() + 1)
     }
 
+    private fun getRandomDelay(delayRange: Pair<Double, Double>): Int {
+        return Random.nextInt(delayRange.first.toInt(), delayRange.second.toInt() + 1)
+    }
+
     private fun countSilverfish(): Int {
         val entities = mc.level?.entitiesForRendering() ?: return 0
         return entities.count { it is Silverfish && it.position().distanceTo(mc.player?.position() ?: Vec3.ZERO) <= 10.0 }
@@ -132,34 +160,35 @@ object WormFishing : Module("WormFishing Settings") {
         when (macroState) {
             MacroState.SWAP_TO_ROD -> {
                 swapToFishingRod()
-                clock.schedule(Random.nextInt(200, 500))
+                clock.schedule(getRandomDelay(rodSwapDelay))
                 macroState = MacroState.CASTING
             }
 
             MacroState.CASTING -> {
                 MouseUtils.rightClick()
                 waitingStartTime = System.currentTimeMillis()
-                clock.schedule(Random.nextInt(castDelay.first.toInt(), castDelay.second.toInt()))
+                currentBobberTimeout = getRandomDelay(bobberTimeout).toLong()
+                clock.schedule(getRandomDelay(castDelay))
                 macroState = MacroState.WAITING
             }
 
             MacroState.WAITING -> {
                 if (detectFishbite()) {
-                    clock.schedule(Random.nextInt(reelInDelay.first.toInt(), reelInDelay.second.toInt()))
+                    clock.schedule(getRandomDelay(reelInDelay))
                     macroState = MacroState.REELING
                 } else {
                     val bobber = mc.player?.fishing
                     val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
                     if (bobber == null) {
-                        clock.schedule(Random.nextInt(100, 200))
+                        clock.schedule(getRandomDelay(missingBobberRecastDelay))
                         macroState = MacroState.CASTING
                         return
                     }
 
-                    if (!isBobbing && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
+                    if (!isBobbing && System.currentTimeMillis() - waitingStartTime > currentBobberTimeout) {
                         macroState = MacroState.REELING
-                        clock.schedule(Random.nextInt(100, 200))
+                        clock.schedule(getRandomDelay(failedBobbingRecastDelay))
                     }
                 }
             }
@@ -184,7 +213,7 @@ object WormFishing : Module("WormFishing Settings") {
                 val hypSlot = InventoryUtils.findItemInHotbar("hyperion")
                 if (hypSlot != -1) {
                     InventoryUtils.holdHotbarSlot(hypSlot)
-                    clock.schedule(Random.nextInt(hyperionSwapDelay.first.toInt(), hyperionSwapDelay.second.toInt() + 1))
+                    clock.schedule(getRandomDelay(hyperionSwapDelay))
                     macroState = MacroState.HYPERION_USE
                 } else {
                     macroState = MacroState.RESET
