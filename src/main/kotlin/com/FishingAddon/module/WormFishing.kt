@@ -3,24 +3,18 @@ package com.FishingAddon.module
 import com.FishingAddon.module.Main.detectFishbite
 import com.FishingAddon.module.Main.swapToFishingRod
 import com.FishingAddon.util.helper.Clock
-import java.awt.Color
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.world.entity.monster.Silverfish
 import net.minecraft.world.level.Level
 import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
-import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.RangeSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.util.MouseUtils
-import org.cobalt.api.util.render.Render3D
 
 object WormFishing : Module("WormFishing Settings") {
     private val castDelay by RangeSetting(
@@ -55,28 +49,6 @@ object WormFishing : Module("WormFishing Settings") {
         max = 20.0
     )
 
-    private val highlightWormfishSpot by CheckboxSetting(
-        name = "Highlight Wormfish Spots",
-        description = "Highlights potential wormfish fishing spots in the Crystal Hollows.",
-        defaultValue = false
-    )
-
-    private val wormfishEspRadius by SliderSetting(
-        name = "Wormfish ESP Radius",
-        description = "Radius (in blocks) to scan for lava blocks to highlight.",
-        defaultValue = 10.0,
-        min = 1.0,
-        max = 128.0
-    )
-
-    private val wormfishEspRescanDelay by SliderSetting(
-        name = "Wormfish ESP Rescan Delay",
-        description = "Delay between lava rescans for ESP (in ms).",
-        defaultValue = 500.0,
-        min = 0.0,
-        max = 10000.0
-    )
-
     private val hyperionSwapDelay by RangeSetting(
         name = "Hyperion Swap Delay",
         description = "Delay between swapping to Hyperion and using it (in ms)",
@@ -98,8 +70,6 @@ object WormFishing : Module("WormFishing Settings") {
     private val mc = Minecraft.getInstance()
     private var waitingStartTime = 0L
     private var currentKillThreshold = 20
-    private val cachedLavaPositions = mutableListOf<BlockPos>()
-    private var lastLavaScanTime = 0L
 
     private enum class MacroState {
         IDLE,
@@ -256,33 +226,4 @@ object WormFishing : Module("WormFishing Settings") {
         return spots
     }
 
-    @SubscribeEvent
-    fun onWorldRender(event: WorldRenderEvent.Start) {
-        if (!highlightWormfishSpot) return
-
-        val player = mc.player ?: return
-        val level = mc.level ?: return
-        val playerPos = player.blockPosition()
-        val now = System.currentTimeMillis()
-        val scanRadius = wormfishEspRadius.toInt()
-        val scanDelayMs = wormfishEspRescanDelay.toLong()
-
-        if (now - lastLavaScanTime >= scanDelayMs) {
-            cachedLavaPositions.clear()
-            cachedLavaPositions.addAll(detectWormfishSpots(level, playerPos, scanRadius))
-            lastLavaScanTime = now
-        }
-
-        if (cachedLavaPositions.isEmpty()) return
-
-        for (lavaPos in cachedLavaPositions) {
-            val blockBox = AABB.ofSize(
-                Vec3.atCenterOf(lavaPos),
-                1.0,
-                1.0,
-                1.0
-            )
-            Render3D.drawBox(event.context, blockBox, Color(0, 150, 255), esp = true)
-        }
-    }
 }

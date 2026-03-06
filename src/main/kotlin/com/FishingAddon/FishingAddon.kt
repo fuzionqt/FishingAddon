@@ -8,6 +8,7 @@ import com.FishingAddon.module.Normal
 import com.FishingAddon.module.HotspotFishing
 import com.FishingAddon.module.QOL
 import com.FishingAddon.module.SurfStriders
+import com.FishingAddon.module.Visuals
 import com.FishingAddon.module.WormFishing
 
 object FishingAddon : Addon() {
@@ -18,6 +19,7 @@ object FishingAddon : Addon() {
             Normal,
             SurfStriders,
             WormFishing,
+            Visuals,
             HotspotFishing,
             QOL
         ).forEach(EventBus::register)
@@ -29,6 +31,6 @@ object FishingAddon : Addon() {
     }
 
     override fun getModules(): List<Module> {
-        return listOf(Main, Normal, SurfStriders, WormFishing, HotspotFishing, QOL)
+        return listOf(Main, Normal, SurfStriders, WormFishing, Visuals, HotspotFishing, QOL)
     }
 }

@@ -1,16 +1,10 @@
 package com.FishingAddon.module
 
-import org.cobalt.api.util.ui.NVGRenderer
-import java.awt.Color
-import kotlin.math.floor
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import net.minecraft.util.ARGB.color
 import net.minecraft.world.entity.decoration.ArmorStand
-import net.minecraft.world.phys.AABB
 import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
-import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.util.ChatUtils
@@ -20,8 +14,6 @@ import org.lwjgl.glfw.GLFW
 import org.cobalt.api.module.setting.impl.ModeSetting
 import org.cobalt.api.util.InventoryUtils
 import org.cobalt.api.event.impl.render.NvgEvent
-import org.cobalt.api.util.render.Render3D
-import org.cobalt.api.event.Event
 
 object Main : Module(
     name = "Main tab",
@@ -50,21 +42,10 @@ object Main : Module(
     private var isPausedByScreen = false
     private val mc = Minecraft.getInstance()
 
-    // thanks claude for rendering the box for me <3
-    private var savedBlockX = 0
-    private var savedBlockY = 0
-    private var savedBlockZ = 0
-
     fun start() {
         isToggled = true
 
-        val player = mc.player
-        if (player != null) {
-            val playerPos = player.position()
-            savedBlockX = floor(playerPos.x).toInt()
-            savedBlockY = floor(playerPos.y - 1).toInt()
-            savedBlockZ = floor(playerPos.z).toInt()
-        }
+        Visuals.captureStartBlock()
 
         when (mode) {
             0 -> Normal.start()
@@ -144,19 +125,6 @@ object Main : Module(
             1 -> SurfStriders.onTick()
             2 -> WormFishing.onTick()
         }
-    }
-
-    @SubscribeEvent
-    fun onWorldRender(event: WorldRenderEvent.Start) {
-        if (!isToggled) return
-
-        // thanks claude for rendering the box for me <3
-        val blockBox = AABB(
-            savedBlockX.toDouble(), savedBlockY.toDouble(), savedBlockZ.toDouble(),
-            (savedBlockX + 1).toDouble(), (savedBlockY + 1).toDouble(), (savedBlockZ + 1).toDouble()
-        )
-
-        Render3D.drawBox(event.context, blockBox, Color(0, 150, 255), esp = true)
     }
 
     @SubscribeEvent
