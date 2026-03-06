@@ -29,22 +29,6 @@ object WormFishing : Module("WormFishing Settings") {
         defaultValue = false
     )
 
-    private val lavaEspRadius by SliderSetting(
-        name = "Lava ESP Radius",
-        description = "Horizontal scan radius for lava ESP (in blocks).",
-        defaultValue = 30.0,
-        min = 8.0,
-        max = 64.0
-    )
-
-    private val lavaEspRefreshRate by SliderSetting(
-        name = "Lava ESP Refresh",
-        description = "How often lava ESP rescans nearby blocks (in ms).",
-        defaultValue = 1000.0,
-        min = 250.0,
-        max = 5000.0
-    )
-
     private val castDelay by RangeSetting(
         name = "Cast Delay",
         description = "Delay range before casting (in ms)",
@@ -62,27 +46,11 @@ object WormFishing : Module("WormFishing Settings") {
     )
 
     private val bobberTimeout by SliderSetting(
-        name = "Recast Bobber Delay",
+        name = "Recast Bobber",
         description = "Time to wait for bobber to enter water before recasting (in ms)",
         defaultValue = 20000.0,
         min = 5000.0,
         max = 60000.0
-    )
-
-    private val rodSwapDelay by RangeSetting(
-        name = "Rod Swap Delay",
-        description = "Delay after swapping to rod before casting (in ms)",
-        defaultValue = Pair(200.0, 500.0),
-        min = 50.0,
-        max = 1500.0
-    )
-
-    private val transitionDelay by RangeSetting(
-        name = "Transition Delay",
-        description = "Shared short delay for recast/reel transitions (in ms)",
-        defaultValue = Pair(100.0, 200.0),
-        min = 10.0,
-        max = 1000.0
     )
 
     private val killSilverfishAt by RangeSetting(
@@ -101,15 +69,19 @@ object WormFishing : Module("WormFishing Settings") {
         max = 1000.0
     )
 
+    private val stateTransitionDelay by RangeSetting(
+        name = "State Transition Delay",
+        description = "Small delays between logic steps (in ms)",
+        defaultValue = Pair(100.0, 200.0),
+        min = 10.0,
+        max = 500.0
+    )
+
     private var macroState = MacroState.IDLE
     private val clock = Clock()
     private val mc = Minecraft.getInstance()
     private var waitingStartTime = 0L
     private var currentKillThreshold = 20
-    private var cachedLavaBoxes: List<AABB> = emptyList()
-    private var lastLavaScanCenter: BlockPos? = null
-    private var lastLavaScanAt = 0L
-    private var lastLavaScanLevelId = 0
 
     private enum class MacroState {
         IDLE,
@@ -126,8 +98,7 @@ object WormFishing : Module("WormFishing Settings") {
 
     internal fun start() {
         generateNewThreshold()
-        val isBobbing = mc.player?.fishing?.let { it.isInWater || it.isInLava } ?: false
-        macroState = if (isBobbing) MacroState.WAITING else MacroState.SWAP_TO_ROD
+        macroState = MacroState.SWAP_TO_ROD
     }
 
     internal fun resetStates() {
@@ -139,6 +110,10 @@ object WormFishing : Module("WormFishing Settings") {
             killSilverfishAt.first.toInt(),
             killSilverfishAt.second.toInt() + 1
         )
+    }
+
+    private fun getTransitionDelay(): Int {
+        return Random.nextInt(stateTransitionDelay.first.toInt(), stateTransitionDelay.second.toInt() + 1)
     }
 
     private fun countSilverfish(): Int {
@@ -157,7 +132,7 @@ object WormFishing : Module("WormFishing Settings") {
         when (macroState) {
             MacroState.SWAP_TO_ROD -> {
                 swapToFishingRod()
-                clock.schedule(Random.nextInt(rodSwapDelay.first.toInt(), rodSwapDelay.second.toInt()))
+                clock.schedule(Random.nextInt(200, 500))
                 macroState = MacroState.CASTING
             }
 
@@ -177,31 +152,31 @@ object WormFishing : Module("WormFishing Settings") {
                     val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
 
                     if (bobber == null) {
-                        clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
+                        clock.schedule(Random.nextInt(100, 200))
                         macroState = MacroState.CASTING
                         return
                     }
 
                     if (!isBobbing && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
                         macroState = MacroState.REELING
-                        clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
+                        clock.schedule(Random.nextInt(100, 200))
                     }
                 }
             }
 
             MacroState.REELING -> {
                 MouseUtils.rightClick()
-                clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
                 macroState = MacroState.POST_REEL_DECIDE
+                clock.schedule(getTransitionDelay())
             }
 
             MacroState.POST_REEL_DECIDE -> {
                 if (shouldKillSilverfish()) {
-                    clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
                     macroState = MacroState.HYPERION_SWAP
+                    clock.schedule(getTransitionDelay())
                 } else {
-                    clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
-                    macroState = MacroState.RESETTING
+                    macroState = MacroState.CASTING
+                    clock.schedule(getTransitionDelay())
                 }
             }
 
@@ -209,20 +184,22 @@ object WormFishing : Module("WormFishing Settings") {
                 val hypSlot = InventoryUtils.findItemInHotbar("hyperion")
                 if (hypSlot != -1) {
                     InventoryUtils.holdHotbarSlot(hypSlot)
-                    clock.schedule(Random.nextInt(hyperionSwapDelay.first.toInt(), hyperionSwapDelay.second.toInt()))
+                    clock.schedule(Random.nextInt(hyperionSwapDelay.first.toInt(), hyperionSwapDelay.second.toInt() + 1))
                     macroState = MacroState.HYPERION_USE
                 } else {
                     macroState = MacroState.RESET
                 }
             }
+
             MacroState.HYPERION_USE -> {
                 MouseUtils.rightClick()
+                clock.schedule(getTransitionDelay())
                 macroState = MacroState.RESET
             }
 
             MacroState.RESET -> {
                 generateNewThreshold()
-                clock.schedule(Random.nextInt(transitionDelay.first.toInt(), transitionDelay.second.toInt()))
+                clock.schedule(getTransitionDelay())
                 macroState = MacroState.SWAP_TO_ROD
             }
 
@@ -235,74 +212,48 @@ object WormFishing : Module("WormFishing Settings") {
         }
     }
 
-    private fun shouldRefreshLavaScan(center: BlockPos, level: Level): Boolean {
-        val now = System.currentTimeMillis()
-        val refreshInterval = lavaEspRefreshRate.toLong()
-        val previousCenter = lastLavaScanCenter
-        val levelId = System.identityHashCode(level)
-        if (previousCenter == null || lastLavaScanLevelId != levelId) return true
-        if (now - lastLavaScanAt >= refreshInterval) return true
-
-        // Rescan sooner if player moved enough to expose new nearby lava.
-        return previousCenter.distManhattan(center) >= 3
-    }
-
-    fun detectWormfishSpots(
+    fun detectWormfishSpot(
         level: Level,
         center: BlockPos,
         radius: Int,
-    ): List<AABB> {
+    ): BlockPos? {
         val minX = center.x - radius
         val maxX = center.x + radius
         val minZ = center.z - radius
         val maxZ = center.z + radius
-        // Keep scan bounds mapping-safe and aligned with prior Crystal Hollows worm spot logic.
-        val minY = 65
-        val maxY = 320
-        val lavaBoxes = mutableListOf<AABB>()
-        val mutablePos = BlockPos.MutableBlockPos()
 
         for (x in minX..maxX) {
             for (z in minZ..maxZ) {
-                for (y in minY..maxY) {
-                    mutablePos.set(x, y, z)
-                    val blockState = level.getBlockState(mutablePos)
+                for (y in 65..320) {
+                    val pos = BlockPos(x, y, z)
+                    val blockState = level.getBlockState(pos)
 
                     if (blockState.`is`(Blocks.LAVA)) {
-                        lavaBoxes.add(
-                            AABB.ofSize(
-                                Vec3.atCenterOf(mutablePos),
-                                1.0,
-                                1.0,
-                                1.0
-                            )
-                        )
+                        return pos
                     }
                 }
             }
         }
 
-        return lavaBoxes
+        return null
     }
 
     @SubscribeEvent
-    fun  onWorldRender(event: WorldRenderEvent.Start) {
+    fun onWorldRender(event: WorldRenderEvent.Start) {
         if (!highlightWormfishSpot) return
 
         val player = mc.player ?: return
         val level = mc.level ?: return
         val playerPos = player.blockPosition()
+        val lavaPos = detectWormfishSpot(level, playerPos, 128) ?: return
 
-        if (shouldRefreshLavaScan(playerPos, level)) {
-            val radius = lavaEspRadius.toInt()
-            cachedLavaBoxes = detectWormfishSpots(level, playerPos, radius)
-            lastLavaScanCenter = playerPos.immutable()
-            lastLavaScanAt = System.currentTimeMillis()
-            lastLavaScanLevelId = System.identityHashCode(level)
-        }
+        val blockBox = AABB.ofSize(
+            Vec3.atCenterOf(lavaPos),
+            1.0,
+            1.0,
+            1.0
+        )
 
-        for (lavaBox in cachedLavaBoxes) {
-            Render3D.drawBox(event.context, lavaBox, Color(191, 70, 63), esp = true)
-        }
+        Render3D.drawBox(event.context, blockBox, Color(191, 70, 63), esp = true)
     }
 }

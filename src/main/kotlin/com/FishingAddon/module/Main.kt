@@ -37,12 +37,12 @@ object Main : Module(
     var keyBind by KeyBindSetting(
         name = "Macro Keybind",
         description = "Keybind to toggle the macro",
-        defaultValue = KeyBind(GLFW.GLFW_KEY_Y)
+        defaultValue = KeyBind(GLFW.GLFW_KEY_J)
     )
     var ungrabMouseKeyBind by KeyBindSetting(
         name = "Ungrab Mouse Keybind",
         description = "Keybind to toggle mouse grab",
-        defaultValue = KeyBind(GLFW.GLFW_KEY_O)
+        defaultValue = KeyBind(GLFW.GLFW_KEY_U)
     )
     private val renderMacroEsp by CheckboxSetting(
         name = "Render Macro ESP",
