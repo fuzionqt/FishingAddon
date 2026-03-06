@@ -12,7 +12,6 @@ import org.cobalt.api.event.annotation.SubscribeEvent
 import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
-import org.cobalt.api.module.setting.impl.CheckboxSetting
 import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.MouseUtils
@@ -27,13 +26,6 @@ import org.cobalt.api.event.Event
 object Main : Module(
     name = "Main tab",
 ) {
-    val mode by ModeSetting(
-        name = "FishingMode",
-        description = "Fishing mode setting",
-        defaultValue = 0,
-        options = arrayOf("Normal", "SurfStriders", "Worm fishing", "Hotspot fishing(WIP)", "Piscary fishing(WIP)")
-    )
-
     var keyBind by KeyBindSetting(
         name = "Macro Keybind",
         description = "Keybind to toggle the macro",
@@ -44,10 +36,11 @@ object Main : Module(
         description = "Keybind to toggle mouse grab",
         defaultValue = KeyBind(GLFW.GLFW_KEY_U)
     )
-    private val renderMacroEsp by CheckboxSetting(
-        name = "Render Macro ESP",
-        description = "Renders the saved block ESP while the macro is enabled.",
-        defaultValue = true
+    val mode by ModeSetting(
+        name = "FishingMode",
+        description = "Fishing mode setting",
+        defaultValue = 0,
+        options = arrayOf("Normal", "SurfStriders", "Worm fishing(WIP)", "Hotspot fishing(WIP)", "Piscary fishing(WIP)")
     )
 
     private var isToggled = false
@@ -155,7 +148,7 @@ object Main : Module(
 
     @SubscribeEvent
     fun onWorldRender(event: WorldRenderEvent.Start) {
-        if (!isToggled || !renderMacroEsp) return
+        if (!isToggled) return
 
         // thanks claude for rendering the box for me <3
         val blockBox = AABB(
@@ -163,7 +156,7 @@ object Main : Module(
             (savedBlockX + 1).toDouble(), (savedBlockY + 1).toDouble(), (savedBlockZ + 1).toDouble()
         )
 
-        Render3D.drawBox(event.context, blockBox, Color(0, 150, 255, 25), esp = true)
+        Render3D.drawBox(event.context, blockBox, Color(0, 150, 255), esp = true)
     }
 
     @SubscribeEvent
