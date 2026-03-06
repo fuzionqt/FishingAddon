@@ -62,6 +62,22 @@ object WormFishing : Module("WormFishing Settings") {
         defaultValue = false
     )
 
+    private val wormfishEspRadius by SliderSetting(
+        name = "Wormfish ESP Radius",
+        description = "Radius (in blocks) to scan for lava blocks to highlight.",
+        defaultValue = 10.0,
+        min = 1.0,
+        max = 128.0
+    )
+
+    private val wormfishEspRescanDelay by SliderSetting(
+        name = "Wormfish ESP Rescan Delay",
+        description = "Delay between lava rescans for ESP (in ms).",
+        defaultValue = 500.0,
+        min = 0.0,
+        max = 10000.0
+    )
+
     private val hyperionSwapDelay by RangeSetting(
         name = "Hyperion Swap Delay",
         description = "Delay between swapping to Hyperion and using it (in ms)",
@@ -86,7 +102,6 @@ object WormFishing : Module("WormFishing Settings") {
     private val cachedLavaPositions = mutableListOf<BlockPos>()
     private var lastLavaScanTime = 0L
     private var lastScanCenter: BlockPos? = null
-    private val lavaScanIntervalMs = 500L
     private val lavaRescanDistance = 2
 
     private enum class MacroState {
@@ -254,15 +269,17 @@ object WormFishing : Module("WormFishing Settings") {
         val level = mc.level ?: return
         val playerPos = player.blockPosition()
         val now = System.currentTimeMillis()
+        val scanRadius = wormfishEspRadius.toInt()
+        val scanDelayMs = wormfishEspRescanDelay.toLong()
         val movedEnough = lastScanCenter?.let {
             abs(it.x - playerPos.x) >= lavaRescanDistance ||
                 abs(it.y - playerPos.y) >= lavaRescanDistance ||
                 abs(it.z - playerPos.z) >= lavaRescanDistance
         } ?: true
 
-        if (movedEnough || now - lastLavaScanTime >= lavaScanIntervalMs) {
+        if (movedEnough || now - lastLavaScanTime >= scanDelayMs) {
             cachedLavaPositions.clear()
-            cachedLavaPositions.addAll(detectWormfishSpots(level, playerPos, 10))
+            cachedLavaPositions.addAll(detectWormfishSpots(level, playerPos, scanRadius))
             lastLavaScanTime = now
             lastScanCenter = playerPos
         }
