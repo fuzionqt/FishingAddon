@@ -4,6 +4,7 @@ import com.FishingAddon.module.Main.detectFishbite
 import com.FishingAddon.module.Main.swapToFishingRod
 import com.FishingAddon.util.helper.Clock
 import java.awt.Color
+import kotlin.math.abs
 import kotlin.random.Random
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -82,6 +83,11 @@ object WormFishing : Module("WormFishing Settings") {
     private val mc = Minecraft.getInstance()
     private var waitingStartTime = 0L
     private var currentKillThreshold = 20
+    private val cachedLavaPositions = mutableListOf<BlockPos>()
+    private var lastLavaScanTime = 0L
+    private var lastScanCenter: BlockPos? = null
+    private val lavaScanIntervalMs = 500L
+    private val lavaRescanDistance = 2
 
     private enum class MacroState {
         IDLE,
@@ -212,30 +218,32 @@ object WormFishing : Module("WormFishing Settings") {
         }
     }
 
-    fun detectWormfishSpot(
+    fun detectWormfishSpots(
         level: Level,
         center: BlockPos,
         radius: Int,
-    ): BlockPos? {
+    ): List<BlockPos> {
         val minX = center.x - radius
         val maxX = center.x + radius
         val minZ = center.z - radius
         val maxZ = center.z + radius
+        val spots = mutableListOf<BlockPos>()
+        val mutablePos = BlockPos.MutableBlockPos()
 
         for (x in minX..maxX) {
             for (z in minZ..maxZ) {
                 for (y in 65..320) {
-                    val pos = BlockPos(x, y, z)
-                    val blockState = level.getBlockState(pos)
+                    mutablePos.set(x, y, z)
+                    val blockState = level.getBlockState(mutablePos)
 
                     if (blockState.`is`(Blocks.LAVA)) {
-                        return pos
+                        spots.add(mutablePos.immutable())
                     }
                 }
             }
         }
 
-        return null
+        return spots
     }
 
     @SubscribeEvent
@@ -245,15 +253,30 @@ object WormFishing : Module("WormFishing Settings") {
         val player = mc.player ?: return
         val level = mc.level ?: return
         val playerPos = player.blockPosition()
-        val lavaPos = detectWormfishSpot(level, playerPos, 10) ?: return
+        val now = System.currentTimeMillis()
+        val movedEnough = lastScanCenter?.let {
+            abs(it.x - playerPos.x) >= lavaRescanDistance ||
+                abs(it.y - playerPos.y) >= lavaRescanDistance ||
+                abs(it.z - playerPos.z) >= lavaRescanDistance
+        } ?: true
 
-        val blockBox = AABB.ofSize(
-            Vec3.atCenterOf(lavaPos),
-            1.0,
-            1.0,
-            1.0
-        )
+        if (movedEnough || now - lastLavaScanTime >= lavaScanIntervalMs) {
+            cachedLavaPositions.clear()
+            cachedLavaPositions.addAll(detectWormfishSpots(level, playerPos, 10))
+            lastLavaScanTime = now
+            lastScanCenter = playerPos
+        }
 
-        Render3D.drawBox(event.context, blockBox, Color(0, 150, 255), esp = true)
+        if (cachedLavaPositions.isEmpty()) return
+
+        for (lavaPos in cachedLavaPositions) {
+            val blockBox = AABB.ofSize(
+                Vec3.atCenterOf(lavaPos),
+                1.0,
+                1.0,
+                1.0
+            )
+            Render3D.drawBox(event.context, blockBox, Color(0, 150, 255), esp = true)
+        }
     }
 }
