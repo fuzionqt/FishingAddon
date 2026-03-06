@@ -130,18 +130,17 @@ object WormFishing : Module("WormFishing Settings") {
         )
     }
 
-    private fun getTransitionDelay(): Int {
-        return Random.nextInt(stateTransitionDelay.first.toInt(), stateTransitionDelay.second.toInt() + 1)
-    }
+    private fun getTransitionDelay(): Int =
+        Random.nextInt(stateTransitionDelay.first.toInt(), stateTransitionDelay.second.toInt() + 1)
 
     private fun countSilverfish(): Int {
         val entities = mc.level?.entitiesForRendering() ?: return 0
-        return entities.count { it is Silverfish && it.position().distanceTo(mc.player?.position() ?: Vec3.ZERO) <= 10.0 }
+        return entities.count {
+            it is Silverfish && it.position().distanceTo(mc.player?.position() ?: Vec3.ZERO) <= 10.0
+        }
     }
 
-    private fun shouldKillSilverfish(): Boolean {
-        return countSilverfish() >= currentKillThreshold
-    }
+    private fun shouldKillSilverfish(): Boolean = countSilverfish() >= currentKillThreshold
 
     internal fun onTick() {
         if (!clock.passed()) return
@@ -225,8 +224,7 @@ object WormFishing : Module("WormFishing Settings") {
                 macroState = MacroState.SWAP_TO_ROD
             }
 
-            MacroState.IDLE -> {
-            }
+            MacroState.IDLE -> Unit
         }
     }
 
