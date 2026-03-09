@@ -2,22 +2,16 @@ package com.FishingAddon.module
 
 import java.awt.Color
 import kotlin.math.floor
-import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.annotation.SubscribeEvent
-import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
-import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
-import org.cobalt.api.util.ChatUtils
 import org.cobalt.api.util.render.Render3D
-import org.cobalt.api.util.helper.KeyBind
-import org.lwjgl.glfw.GLFW
 
 object Visuals : Module("Visuals") {
     private val renderStartBlockBox by CheckboxSetting(
@@ -32,18 +26,12 @@ object Visuals : Module("Visuals") {
         defaultValue = false
     )
 
-    private val wormfishScannerKeyBind by KeyBindSetting(
-        name = "Wormfish Scanner Keybind",
-        description = "Keybind to toggle the Wormfish ESP scanner.",
-        defaultValue = KeyBind(GLFW.GLFW_KEY_UNKNOWN)
-    )
-
     private val wormfishEspRadius by SliderSetting(
         name = "Wormfish ESP Radius",
         description = "Radius (in blocks) to scan for lava blocks to highlight.",
-        defaultValue = 192.0,
+        defaultValue = 128.0,
         min = 1.0,
-        max = 256.0
+        max = 128.0
     )
 
     private val wormfishEspRescanDelay by SliderSetting(
@@ -61,10 +49,6 @@ object Visuals : Module("Visuals") {
     private var hasSavedStartBlock = false
     private val cachedLavaPositions = mutableListOf<BlockPos>()
     private var lastLavaScanTime = 0L
-    private var lastLavaScanCenter: BlockPos? = null
-    private var lastLavaDimension = ""
-    private var wormfishScannerOverride: Boolean? = null
-    private var wasWormfishScannerKeyPressed = false
 
     internal fun captureStartBlock() {
         val player = mc.player ?: return
@@ -82,31 +66,6 @@ object Visuals : Module("Visuals") {
     private fun clearWormfishCache() {
         cachedLavaPositions.clear()
         lastLavaScanTime = 0L
-        lastLavaScanCenter = null
-        lastLavaDimension = ""
-    }
-
-    private fun isWormfishScannerActive(): Boolean {
-        return wormfishScannerOverride ?: highlightWormfishSpot
-    }
-
-    @SubscribeEvent
-    fun onTick(event: TickEvent) {
-        val isPressed = wormfishScannerKeyBind.isPressed()
-        if (isPressed && !wasWormfishScannerKeyPressed) {
-            val nextState = !isWormfishScannerActive()
-            wormfishScannerOverride = if (nextState == highlightWormfishSpot) null else nextState
-            if (!nextState) {
-                clearWormfishCache()
-            }
-
-            ChatUtils.sendMessage(
-                "Wormfish Scanner is now "
-                    + if (nextState) "${ChatFormatting.GREEN}Enabled" else "${ChatFormatting.RED}Disabled"
-                    + ChatFormatting.RESET
-            )
-        }
-        wasWormfishScannerKeyPressed = isPressed
     }
 
     @SubscribeEvent
@@ -119,7 +78,7 @@ object Visuals : Module("Visuals") {
             Render3D.drawBox(event.context, blockBox, Color(0, 150, 255, 100), esp = true)
         }
 
-        if (!isWormfishScannerActive()) {
+        if (!highlightWormfishSpot) {
             clearWormfishCache()
             return
         }
@@ -130,18 +89,11 @@ object Visuals : Module("Visuals") {
         val now = System.currentTimeMillis()
         val scanRadius = wormfishEspRadius.toInt()
         val scanDelayMs = wormfishEspRescanDelay.toLong()
-        val currentDimension = level.dimension().toString()
-        val previousCenter = lastLavaScanCenter
-        val movedEnoughToRescan = previousCenter == null || horizontalDistanceSquared(playerPos, previousCenter) >= 32 * 32
-        val dimensionChanged = lastLavaDimension != currentDimension
-        val shouldRescan = cachedLavaPositions.isEmpty() || dimensionChanged || movedEnoughToRescan || now - lastLavaScanTime >= scanDelayMs
 
-        if (shouldRescan) {
+        if (now - lastLavaScanTime >= scanDelayMs) {
             cachedLavaPositions.clear()
             cachedLavaPositions.addAll(WormFishing.detectWormfishSpots(level, playerPos, scanRadius))
             lastLavaScanTime = now
-            lastLavaScanCenter = playerPos.immutable()
-            lastLavaDimension = currentDimension
         }
 
         if (cachedLavaPositions.isEmpty()) return
