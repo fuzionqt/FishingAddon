@@ -7,11 +7,16 @@ import net.minecraft.core.BlockPos
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
 import org.cobalt.api.event.annotation.SubscribeEvent
+import org.cobalt.api.event.impl.client.TickEvent
 import org.cobalt.api.event.impl.render.WorldRenderEvent
 import org.cobalt.api.module.Module
 import org.cobalt.api.module.setting.impl.CheckboxSetting
+import org.cobalt.api.module.setting.impl.KeyBindSetting
 import org.cobalt.api.module.setting.impl.SliderSetting
+import org.cobalt.api.util.ChatUtils
+import org.cobalt.api.util.helper.KeyBind
 import org.cobalt.api.util.render.Render3D
+import org.lwjgl.glfw.GLFW
 
 object Visuals : Module("Visuals") {
     private val renderStartBlockBox by CheckboxSetting(
@@ -20,10 +25,16 @@ object Visuals : Module("Visuals") {
         defaultValue = true
     )
 
-    private val highlightWormfishSpot by CheckboxSetting(
+    private var highlightWormfishSpot by CheckboxSetting(
         name = "Highlight Wormfish Spots",
         description = "Highlights potential wormfish fishing spots in the Crystal Hollows.",
         defaultValue = false
+    )
+
+    private val highlightWormfishKeyBind by KeyBindSetting(
+        name = "Wormfish Spots Keybind",
+        description = "Keybind to toggle Wormfish Spots highlights.",
+        defaultValue = KeyBind(GLFW.GLFW_KEY_UNKNOWN)
     )
 
     private val wormfishEspRadius by SliderSetting(
@@ -49,6 +60,7 @@ object Visuals : Module("Visuals") {
     private var hasSavedStartBlock = false
     private val cachedLavaPositions = mutableListOf<BlockPos>()
     private var lastLavaScanTime = 0L
+    private var wasWormfishKeyPressed = false
 
     internal fun captureStartBlock() {
         val player = mc.player ?: return
@@ -66,6 +78,21 @@ object Visuals : Module("Visuals") {
     private fun clearWormfishCache() {
         cachedLavaPositions.clear()
         lastLavaScanTime = 0L
+    }
+
+    @SubscribeEvent
+    fun onTick(event: TickEvent) {
+        val isPressed = highlightWormfishKeyBind.isPressed()
+        if (isPressed && !wasWormfishKeyPressed) {
+            highlightWormfishSpot = !highlightWormfishSpot
+
+            ChatUtils.sendMessage(
+                "Wormfish Spots ESP is now "
+                    + (if (highlightWormfishSpot) "§aEnabled" else "§cDisabled")
+                    + "§r"
+            )
+        }
+        wasWormfishKeyPressed = isPressed
     }
 
     @SubscribeEvent
