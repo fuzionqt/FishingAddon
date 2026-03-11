@@ -71,8 +71,7 @@ object Normal : Module(
     private val clock = Clock()
     private var waitingStartTime = 0L
     private val mc = Minecraft.getInstance()
-    val bobber = mc.player?.fishing
-    var isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+    private var isBobbing = false
 
     private val existingEntityIds = mutableSetOf<Int>()
     private var detectedSeaCreatureEntity: net.minecraft.world.entity.Entity? = null
@@ -97,7 +96,7 @@ object Normal : Module(
     }
 
     internal fun start() {
-        isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+        isBobbing = mc.player?.fishing?.let { it.isInWater || it.isInLava } ?: false
         if (!isBobbing) {
             macroState = MacroState.SWAP_TO_ROD
         } else macroState = MacroState.WAITING
@@ -118,7 +117,7 @@ object Normal : Module(
         if (!clock.passed()) return
 
         if (mc.player == null || mc.level == null || mc.gameMode == null) return
-        isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+        isBobbing = mc.player?.fishing?.let { it.isInWater || it.isInLava } ?: false
 
         when (macroState) {
             MacroState.SWAP_TO_ROD -> {
@@ -141,11 +140,15 @@ object Normal : Module(
                 } else {
                     val bobber = mc.player?.fishing
                     val isBobbing = bobber?.let { it.isInWater || it.isInLava } ?: false
+                    if (bobber == null) {
+                        clock.schedule(Random.nextInt(100, 200))
+                        macroState = MacroState.CASTING
+                        return
+                    }
+
                     if (!isBobbing && bobber != null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
                         macroState = MacroState.REELING
                         clock.schedule(Random.nextInt(100, 200))
-                    } else if (bobber == null && System.currentTimeMillis() - waitingStartTime > bobberTimeout.toLong()) {
-                        macroState = MacroState.CASTING
                     }
                 }
             }
